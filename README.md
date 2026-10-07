@@ -149,9 +149,15 @@ node assets/api-test/scripts/classmap.mjs 类图描述.json 输出.svg
 ## 本地自检（不依赖 DSH）
 
 ```powershell
-node verify.mjs          # 校验清单 + 注册对象 + 技能正文必备内容（118 项）
-node check-patch.mjs     # 校验 cordis.patch.yml 的 insert 结构
+node verify.mjs            # 技能正文 + 注册对象 + 清单校验（135 项）
+node check-patch.mjs       # cordis.patch.yml 的 insert 结构
+node check-encoding.mjs    # 不变式：全仓库无 BOM、JSON 可解析、脚本语法通过
 ```
+
+`check-encoding.mjs` 存在的理由：`package.json` 一旦带上 UTF-8 BOM，
+**从 GitHub 安装会直接失败**（pnpm 报 `Unexpected token '\uFEFF'`）。
+用 PowerShell 的 `Set-Content -Encoding utf8` 改文件会写入 BOM，
+所以改完文件后跑一次它；加 `--fix` 可自动移除 BOM。
 
 两个脚本都是**可移植的**：只读本包内的相对路径，不依赖任何机器专属路径。
 `check-patch.mjs` 会优先借用 DSH 安装里的真实 js-yaml；找不到时退化到内置的

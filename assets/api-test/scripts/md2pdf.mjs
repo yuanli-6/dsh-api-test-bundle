@@ -1,4 +1,4 @@
-﻿/**
+/**
  * md2pdf 鈥?render a Chinese-friendly PDF from a Markdown report.
  *
  * Why this exists: the DSH runtime ships no PDF library (no reportlab/weasyprint
