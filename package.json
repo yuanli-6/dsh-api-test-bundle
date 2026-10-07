@@ -1,6 +1,6 @@
 {
   "name": "dsh-api-test-bundle",
-  "version": "1.3.3",
+  "version": "1.3.4",
   "private": true,
   "description": "Pure-skill DSH bundle: registers the api-test interface testing skill.",
   "keywords": [
@@ -32,6 +32,7 @@
     "assets",
     "verify.mjs",
     "check-patch.mjs",
+    "check-encoding.mjs",
     "README.md",
     "LICENSE"
   ],
