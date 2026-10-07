@@ -47,10 +47,11 @@ function inline(text) {
 }
 
 /** Minimal Markdown -> HTML. Handles the constructs a test report actually uses. */
-function markdownToHtml(md) {
+function markdownToHtml(md, opts = {}) {
   const lines = md.replace(/\r\n?/g, '\n').split('\n')
   const out = []
   let i = 0
+  let wroteContent = false
 
   const renderTable = (rows) => {
     const cells = (row) =>
@@ -74,6 +75,27 @@ function markdownToHtml(md) {
     const line = lines[i]
 
     if (/^\s*$/.test(line)) {
+      i += 1
+      continue
+    }
+
+    // A standalone image: SVG gets inlined, because Chromium's --print-to-pdf
+    // does not fetch file:// images referenced from the page (the PDF would come
+    // out with no image at all). Other formats keep the normal <img> path.
+    const image = /^!\[([^\]]*)\]\(([^)]+)\)\s*$/.exec(line)
+    if (image) {
+      const [, alt, src] = image
+      const isRemote = /^(?:https?:|data:)/i.test(src)
+      const resolved = !isRemote && opts.baseDir ? resolve(opts.baseDir, src) : null
+      if (resolved && /\.svg$/i.test(resolved) && existsSync(resolved)) {
+        const svg = readFileSync(resolved, 'utf8')
+          .replace(/<\?xml[^>]*\?>/i, '')
+          .replace(/<!DOCTYPE[^>]*>/i, '')
+        out.push(`<figure class="diagram">${svg}<figcaption>${inline(alt)}</figcaption></figure>`)
+      } else {
+        out.push(`<figure class="diagram"><img src="${escapeHtml(src)}" alt="${escapeHtml(alt)}"><figcaption>${inline(alt)}</figcaption></figure>`)
+      }
+      wroteContent = true
       i += 1
       continue
     }
@@ -164,8 +186,12 @@ function markdownToHtml(md) {
       para.push(lines[i])
       i += 1
     }
-    if (para.length > 0) out.push(`<p>${inline(para.join(' '))}</p>`)
+    if (para.length > 0) {
+      out.push(`<p>${inline(para.join(' '))}</p>`)
+      wroteContent = true
+    }
   }
+  void wroteContent
   return out.join('\n')
 }
 
@@ -198,6 +224,10 @@ li { margin: 3px 0; }
 hr { border: none; border-top: 1px solid #d8dee4; margin: 22px 0; }
 a { color: #0969da; text-decoration: none; }
 img { max-width: 100%; break-inside: avoid; }
+figure.diagram { margin: 14px 0 18px; text-align: center; break-inside: avoid; }
+figure.diagram svg { max-width: 100%; height: auto; }
+figure.diagram img { max-width: 100%; }
+figure.diagram figcaption { margin-top: 6px; font-size: 11px; color: #6b7280; }
 `
 
 function pickBrowser() {
@@ -234,7 +264,7 @@ const html = `<!doctype html>
 <html lang="zh-CN"><head><meta charset="utf-8"><title>${escapeHtml(cite)}</title>
 <style>${CSS}</style></head>
 <body>
-${markdownToHtml(markdown)}
+${markdownToHtml(markdown, { baseDir: dirname(inputPath) })}
 </body></html>
 `
 
