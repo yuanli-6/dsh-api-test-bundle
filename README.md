@@ -112,15 +112,30 @@ target: <本目录绝对路径>
 
 ## 内置脚本（零依赖）
 
-`assets/api-test/scripts/` 下两个脚本，技能会调用它们，你也可以单独用：
+`assets/api-test/scripts/` 下三个脚本，技能会调用它们，你也可以单独用：
 
 ```powershell
 # Markdown -> PDF：内部用 Chrome/Edge headless 打印，中文字体已适配
 node assets/api-test/scripts/md2pdf.mjs 报告.md [输出.pdf]
 
-# 关系图 -> SVG：自算分层布局，不需要 Graphviz / Java / mermaid-cli
+# 调用链路图 -> SVG：自算分层布局，纵向适合放进 A4
 node assets/api-test/scripts/digraph.mjs 图描述.json 输出.svg
+
+# UML 类关系图 -> SVG：类框分「类名/字段/方法」三栏，关系带箭头语义与基数
+node assets/api-test/scripts/classmap.mjs 类图描述.json 输出.svg
 ```
+
+`classmap.mjs` 的记法参考 PlantUML 类图 / Mermaid `classDiagram`：
+
+| 关系 `type` | 画法 | 语义 |
+| --- | --- | --- |
+| `call` | 实线 + 实心箭头 | 调用 / 委托 |
+| `composition` | 实心菱形 + 箭头 | 组合（由…构建） |
+| `inheritance` | 空心三角 | 继承（extends） |
+| `dependency` | 虚线 + 空心箭头 | 依赖（作为参数） |
+
+字段支持 `marker` 徽标（`PK` / `@Version` / `@TableLogic` / `必填` 等，自动配色）与 `note` 注解说明，
+每条关系可标 `cardinality`（如 `1 → *`），图底部自带图例。
 
 **能力边界（脚本会明确报错，不会假装成功）**：
 
@@ -128,13 +143,13 @@ node assets/api-test/scripts/digraph.mjs 图描述.json 输出.svg
 | --- | --- | --- |
 | Markdown | 无 | — |
 | PDF | 本机 Chrome 或 Edge | 脚本报错并提示安装，或设 `DSH_PDF_BROWSER=<浏览器路径>`；不会伪造 PDF |
-| 关系图 SVG | 无（自带布局算法） | — |
-| Mermaid 源码 | 无 | 报告里可额外附 Mermaid 文本块，GitHub 等能直接渲染 |
+| 调用链路图 / UML 类图 SVG | 无（两个生成器都自带布局算法） | — |
+| Mermaid 源码 | 无 | 报告里会贴出 `classDiagram` 源码块，GitHub 等可直接渲染 |
 
 ## 本地自检（不依赖 DSH）
 
 ```powershell
-node verify.mjs          # 校验清单 + 注册对象 + 技能正文必备内容（109 项）
+node verify.mjs          # 校验清单 + 注册对象 + 技能正文必备内容（118 项）
 node check-patch.mjs     # 校验 cordis.patch.yml 的 insert 结构
 ```
 

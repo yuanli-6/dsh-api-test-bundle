@@ -203,6 +203,14 @@ const flowRequired = [
   ['参数变化记录一节', /参数变化记录/],
   ['md2pdf 脚本用法', /scripts\/md2pdf\.mjs/],
   ['digraph 脚本用法', /scripts\/digraph\.mjs/],
+  ['classmap 脚本用法', /scripts\/classmap\.mjs/],
+  ['classmap 输入格式示例', /"marker": "PK"/],
+  ['关系类型语义表', /实心菱形 \+ 箭头/],
+  ['要求标注基数', /每条关系标注基数/],
+  ['关系图四子节要求', /调用链路图/],
+  ['Mermaid classDiagram 源码要求', /Mermaid `classDiagram` 源码/],
+  ['禁止画不存在的线', /不要画不存在的线/],
+  ['图宽限制 740px', /740px 以内/],
   ['digraph 输入格式示例', /"layout": "vertical"/],
   ['纵向为默认布局', /默认 `vertical`/],
   ['SVG 嵌入 Markdown 的写法', /!\[\]\(api-test-graph\.svg\)/],
@@ -217,7 +225,11 @@ for (const [label, re] of flowRequired) {
 
 console.log('')
 console.log('--- bundled helper scripts present ---')
-for (const rel of ['assets/api-test/scripts/md2pdf.mjs', 'assets/api-test/scripts/digraph.mjs']) {
+for (const rel of [
+  'assets/api-test/scripts/md2pdf.mjs',
+  'assets/api-test/scripts/digraph.mjs',
+  'assets/api-test/scripts/classmap.mjs'
+]) {
   check(`${rel} 存在且非空`, () => assert.ok(readFileSync(rel, 'utf8').length > 500))
 }
 

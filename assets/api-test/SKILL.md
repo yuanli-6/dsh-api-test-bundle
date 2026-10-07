@@ -255,20 +255,67 @@ docs/
    - 异常与边界：非法输入的实际返回
 5. **参数变化记录**：每种接口列出每轮参数，并明确标注**各轮参数互不相同**
 6. **报错统计**：按「接口本身报错」与「连接 / 基础设施报错」分类汇总
-7. **关联关系图**（用户需要时）：图 + 关联字段说明
+7. **关联关系图**（用户需要时）：按下面四个子节给全，不要只丢一张图
+   - **调用链路图**：按请求流向分层（网关 → Controller → Service → Mapper → Entity → DTO）
+   - **UML 类关系图**：每个类分「类名 / 字段 / 方法」三栏，字段带类型与 `«PK»` `«@Version»` `«@TableLogic»` 等标记
+   - **Mermaid `classDiagram` 源码**：便于用户编辑、或在 GitHub 等支持 Mermaid 的地方直接渲染
+   - **关联字段说明表**：逐类列出关键字段与关联语义
 8. **未覆盖部分**：明确说明哪些没测（并发、鉴权、边界外场景等）
+
+### 关系图的记法（参考成熟工具）
+
+按 PlantUML 类图 / Mermaid `classDiagram` 的约定，**关系用不同箭头区分语义**，不要所有边都画成一个样：
+
+| 记法 | 语义 | 用在本例 |
+| --- | --- | --- |
+| 实线 + 实心箭头 | 调用 / 委托 | Controller → Service、Service → Mapper |
+| 实心菱形 + 箭头 | 组合（由…构建） | Mapper → Entity、Entity → VO、VO → PageResult |
+| 空心三角 | 继承（extends） | Mapper extends `BaseMapper<SysUser>` |
+| 虚线 + 空心箭头 | 依赖（作为参数） | Controller ⇢ UserCreateRequest / UserUpdateRequest |
+
+另外要做到：
+- **每条关系标注基数**（如 `1 → *`、`1 → 0..1`），并配图例说明箭头含义
+- **字段必须来自真实源码**，类型、约束、`@Version` / `@TableLogic` 这类关键注解都要标出来，不要凭印象杜撰
+- **不要画不存在的线**：没有继承关系就不要画继承箭头；关系方向要核对（谁依赖谁、谁由谁构建）
+- 图宽控制在 **740px 以内**能放进一页 A4；类多时用更大的画布并接受整体缩放
 
 ### 用脚本生成 PDF 与关系图
 
-本技能自带两个零依赖脚本（`assets/api-test/scripts/`，路径由技能的 `Base directory` 决定）：
+本技能自带三个零依赖脚本（`assets/api-test/scripts/`，路径由技能的 `Base directory` 决定）：
 
 ```powershell
 # Markdown -> PDF（内部用 Chrome/Edge headless 打印，中文字体已适配）
 node "<base>/scripts/md2pdf.mjs" <报告.md> [输出.pdf]
 
-# 关系图 -> SVG（自算分层布局，无需 Graphviz / Java / mermaid）
+# 调用链路图 -> SVG（自算分层布局，无需 Graphviz / Java / mermaid）
 node "<base>/scripts/digraph.mjs" <图描述.json> <输出.svg>
+
+# UML 类关系图 -> SVG（类框分栏显示字段与方法，关系带箭头语义与基数）
+node "<base>/scripts/classmap.mjs" <类图描述.json> <输出.svg>
 ```
+
+`classmap.mjs` 的输入格式：
+
+```json
+{
+  "title": "SysUserController UML 类关系图",
+  "classes": [
+    {
+      "id": "SysUser", "name": "SysUser", "package": "com.example.user.entity",
+      "stereotype": "TableName(sys_user)", "color": "entity",
+      "fields": [{ "name": "id", "type": "Long", "marker": "PK", "note": "IdType.AUTO" }],
+      "methods": ["static from(SysUser): UserVO"]
+    }
+  ],
+  "relations": [
+    { "from": "SysUserMapper", "to": "SysUser", "type": "composition", "label": "映射结果", "cardinality": "1 → *" }
+  ]
+}
+```
+
+`color` 取 `controller` / `service` / `mapper` / `entity` / `dto` / `other`；
+`relations[].type` 取 `call`（实线箭头）/ `composition`（实心菱形）/ `inheritance`（空心三角）/ `dependency`（虚线箭头）；
+`fields[].marker` 是自由文本徽标（`PK` `@Version` `@TableLogic` `必填` 等），脚本会自动配色。
 
 `digraph.mjs` 的输入格式：
 
@@ -291,7 +338,7 @@ node "<base>/scripts/digraph.mjs" <图描述.json> <输出.svg>
 | --- | --- | --- |
 | Markdown | 内置支持 | — |
 | PDF | **靠本机 Chromium 内核**（Chrome 或 Edge）。脚本会自动探测常见路径，也可用环境变量 `DSH_PDF_BROWSER` 指定 | 两者都没有时**明确告知用户**："本机没有 Chrome/Edge，无法生成 PDF，请安装其一或改用 Markdown"，不要伪造 PDF |
-| 关系图 | **自带 SVG 生成器**，自带分层布局（纵向/横向），无需任何外部依赖 | 想要 Mermaid 源码或 PlantUML 风格时可另外附上 Mermaid 文本块（GitHub 等能直接渲染） |
+| 关系图 | **自带两个 SVG 生成器**：`digraph.mjs` 画调用链路、`classmap.mjs` 画 UML 类图（字段/方法/关系语义），无需任何外部依赖 | 想要 Mermaid 源码就另存一份 `.mmd`（报告里也会贴出源码块，GitHub 等能直接渲染） |
 | Graphviz / Java 渲染 | 不依赖 | 不要假设本机有 `dot` / `plantuml`；需要时先探测再决定 |
 
 **验证产物真的生成了**：检查文件存在且非空（PDF 还要确认文件头是 `%PDF-`），
