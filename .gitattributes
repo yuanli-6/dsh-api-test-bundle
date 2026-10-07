@@ -1,0 +1,9 @@
+# Keep line endings identical on every platform: LF in the repository.
+# Without this, a Windows checkout with core.autocrlf=true would rewrite the
+# files, so the same commit would render differently for different people.
+* text=auto eol=lf
+
+# Binary assets (none today, kept for future artwork)
+*.png binary
+*.jpg binary
+*.webp binary

@@ -1,0 +1,6 @@
+# dsh-api-test-bundle patch: inserts this bundle's skill plugin into the
+# profile layer stack. The row's `name` is the package name, so Node
+# resolution finds the installed (or linked) plugin code.
+- insert:
+    - id: dsh-api-test-bundle
+      name: 'dsh-api-test-bundle'

@@ -1,0 +1,43 @@
+{
+  "name": "dsh-api-test-bundle",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Pure-skill DSH bundle: registers the api-test interface testing skill.",
+  "keywords": [
+    "dsh",
+    "dsh-bundle",
+    "dsh-plugin",
+    "skill",
+    "api-test",
+    "deepseek-harness"
+  ],
+  "type": "module",
+  "license": "MIT",
+  "author": "yuanli-6",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yuanli-6/dsh-api-test-bundle.git"
+  },
+  "homepage": "https://github.com/yuanli-6/dsh-api-test-bundle#readme",
+  "bugs": {
+    "url": "https://github.com/yuanli-6/dsh-api-test-bundle/issues"
+  },
+  "exports": {
+    ".": "./index.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "index.js",
+    "cordis.patch.yml",
+    "assets",
+    "verify.mjs",
+    "check-patch.mjs",
+    "README.md",
+    "LICENSE"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  }
+}

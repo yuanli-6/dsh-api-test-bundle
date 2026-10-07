@@ -1,0 +1,20 @@
+# Dependencies installed by the consuming profile
+node_modules/
+
+# Memory/cache dirs created by tooling when this folder doubles as a workspace
+.dsh-meow/
+
+# Lockfiles: this bundle has none of its own (no dependencies)
+pnpm-lock.yaml
+package-lock.json
+yarn.lock
+
+# Packed artifacts, if you ever run `npm pack` here
+*.tgz
+
+# Local editor / OS noise
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.log
