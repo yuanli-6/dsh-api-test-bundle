@@ -259,7 +259,9 @@ if (!existsSync(inputPath)) {
 
 const outputPath = resolve(outputArg ?? join(dirname(inputPath), `${basename(inputPath).replace(/\.md$/i, '')}.pdf`))
 const cite = basename(inputPath, '.md')
-const markdown = readFileSync(inputPath, 'utf8')
+// Strip a UTF-8 BOM: PowerShell's `Out-File -Encoding utf8` writes one, and it
+// would otherwise leak into the first rendered line of the document.
+const markdown = readFileSync(inputPath, 'utf8').replace(/^\uFEFF/, '')
 const html = `<!doctype html>
 <html lang="zh-CN"><head><meta charset="utf-8"><title>${escapeHtml(cite)}</title>
 <style>${CSS}</style></head>
