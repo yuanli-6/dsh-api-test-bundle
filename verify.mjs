@@ -171,6 +171,57 @@ for (const [label, re] of cacheRequired) {
 }
 
 console.log('')
+console.log('--- interactive flow + report contract (assets/api-test/SKILL.md) ---')
+const flowSource = readFileSync('assets/api-test/SKILL.md', 'utf8')
+const flowRequired = [
+  ['交互流程一节存在', /## 交互流程/],
+  ['要求用 ask_user_question 提问', /ask_user_question/],
+  ['说明该工具没有数字输入框', /没有数字输入框/],
+  ['选择 1 测试范围', /选择 1：测试范围/],
+  ['支持多选接口', /multi_select: true/],
+  ['能选整个 Controller', /整个 Controller 的所有接口/],
+  ['选择 2 测试次数', /选择 2：测试次数/],
+  ['给出 1/3/5/10 轮选项', /3 轮（推荐）/],
+  ['要求每轮参数完全不同', /每一轮的所有参数必须完全不同/],
+  ['参数生成含随机串规则', /6 位随机/],
+  ['要求生成后自检不重复', /必须自检/],
+  ['手机号生成规则', /8 位随机数字/],
+  ['选择 3 关联关系图', /选择 3：是否导出关联关系图/],
+  ['关系图链路定义', /Controller → Service → Mapper → Entity → DTO/],
+  ['图形态可选纵向/横向', /纵向拓扑图/],
+  ['选择 4 导出格式', /选择 4：导出格式/],
+  ['报告与产物一节', /## 报告与产物/],
+  ['产物放项目根 docs/ 目录', /项目根的 `docs\/` 目录/],
+  ['产物含 md/PDF/json/svg', /api-test-result\.json/],
+  ['报告含接口清单总表', /接口清单总表/],
+  ['报告含逐接口详情', /逐接口详情/],
+  ['详情含 Java 方法签名与源码行号', /Java 方法签名/],
+  ['详情含直连与经网关地址', /经网关地址/],
+  ['详情含参数位置/类型/必填/约束', /位置\(query\|path\|body\)/],
+  ['详情含成功示例报文', /成功示例报文/],
+  ['详情含异常与边界', /异常与边界/],
+  ['参数变化记录一节', /参数变化记录/],
+  ['md2pdf 脚本用法', /scripts\/md2pdf\.mjs/],
+  ['digraph 脚本用法', /scripts\/digraph\.mjs/],
+  ['digraph 输入格式示例', /"layout": "vertical"/],
+  ['纵向为默认布局', /默认 `vertical`/],
+  ['SVG 嵌入 Markdown 的写法', /!\[\]\(api-test-graph\.svg\)/],
+  ['能力边界表存在', /能力边界（做不到就如实说，不要假装成功）/],
+  ['PDF 可用 DSH_PDF_BROWSER 指定', /DSH_PDF_BROWSER/],
+  ['缺 PDF 能力时如实告知', /不要伪造 PDF/],
+  ['要求验证 PDF 文件头', /%PDF-/]
+]
+for (const [label, re] of flowRequired) {
+  check(label, () => assert.match(flowSource, re))
+}
+
+console.log('')
+console.log('--- bundled helper scripts present ---')
+for (const rel of ['assets/api-test/scripts/md2pdf.mjs', 'assets/api-test/scripts/digraph.mjs']) {
+  check(`${rel} 存在且非空`, () => assert.ok(readFileSync(rel, 'utf8').length > 500))
+}
+
+console.log('')
 if (warnings.length > 0) console.log(`activation warnings: ${warnings.join(' | ')}`)
 console.log(failures.length === 0 ? 'ALL CHECKS PASSED' : `${failures.length} CHECK(S) FAILED`)
 process.exitCode = failures.length === 0 ? 0 : 1

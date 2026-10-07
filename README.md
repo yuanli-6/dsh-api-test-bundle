@@ -99,10 +99,42 @@ target: <本目录绝对路径>
 3. **看是否会被自动触发**：新开一个会话，说「测一下这个接口」之类的话，
    技能目录里应出现 `api-test` 并被命中。
 
+## 交互流程与产物（v1.1.0）
+
+说「测一下这个接口」后，技能会用 `ask_user_question` 依次问你四件事：
+
+1. **测试范围**：某个 Controller 下的单个/多个接口、整个 Controller、或多个 Controller
+2. **测试次数**：1 / 3 / 5 / 10 轮（可自己填），**每轮所有参数互不相同**，生成后会自检不重复
+3. **是否导出关联关系图**：`Controller → Service → Mapper → Entity → DTO`，可选纵向拓扑或横向调用链
+4. **导出格式**：Markdown / Markdown + PDF / 再加接口类与字段关系明细
+
+最终产出放在**被测项目根的 `docs/`**：完整 Markdown 报告、可选 PDF、结构化 `api-test-result.json`、以及关系图 SVG。报告里每个接口都有完整 API 说明（类名、方法签名、源码行号、直连与网关地址、参数表、返回结构、示例报文、逐轮用例、异常边界）。
+
+## 内置脚本（零依赖）
+
+`assets/api-test/scripts/` 下两个脚本，技能会调用它们，你也可以单独用：
+
+```powershell
+# Markdown -> PDF：内部用 Chrome/Edge headless 打印，中文字体已适配
+node assets/api-test/scripts/md2pdf.mjs 报告.md [输出.pdf]
+
+# 关系图 -> SVG：自算分层布局，不需要 Graphviz / Java / mermaid-cli
+node assets/api-test/scripts/digraph.mjs 图描述.json 输出.svg
+```
+
+**能力边界（脚本会明确报错，不会假装成功）**：
+
+| 能力 | 依赖 | 没有时 |
+| --- | --- | --- |
+| Markdown | 无 | — |
+| PDF | 本机 Chrome 或 Edge | 脚本报错并提示安装，或设 `DSH_PDF_BROWSER=<浏览器路径>`；不会伪造 PDF |
+| 关系图 SVG | 无（自带布局算法） | — |
+| Mermaid 源码 | 无 | 报告里可额外附 Mermaid 文本块，GitHub 等能直接渲染 |
+
 ## 本地自检（不依赖 DSH）
 
 ```powershell
-node verify.mjs          # 校验清单 + 注册对象 + 技能正文必备内容
+node verify.mjs          # 校验清单 + 注册对象 + 技能正文必备内容（109 项）
 node check-patch.mjs     # 校验 cordis.patch.yml 的 insert 结构
 ```
 
