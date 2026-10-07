@@ -81,10 +81,28 @@ if (!specPath || !outPath) {
 }
 
 const spec = JSON.parse(readFileSync(specPath, 'utf8').replace(/^\uFEFF/, ''))
-const classes = Array.isArray(spec.classes) ? spec.classes : []
-if (classes.length === 0) {
+const rawClasses = Array.isArray(spec.classes) ? spec.classes : []
+if (rawClasses.length === 0) {
   console.error('[classmap] spec has no classes')
   process.exit(1)
+}
+
+// A diagram with every field of every class stops fitting a page as the class
+// count grows. Above this many classes the boxes keep their identity
+// (name / stereotype / package) and drop the detail compartments, so the shape
+// of the system stays readable. Force either mode explicitly with
+// `"compact": true|false`.
+const COMPACT_THRESHOLD = Number.isFinite(spec.compactThreshold) ? spec.compactThreshold : 24
+const compact =
+  typeof spec.compact === 'boolean' ? spec.compact : rawClasses.length > COMPACT_THRESHOLD
+const classes = compact
+  ? rawClasses.map((c) => ({ ...c, fields: [], methods: [] }))
+  : rawClasses
+if (compact) {
+  console.log(
+    `[classmap] compact mode: ${rawClasses.length} classes > ${COMPACT_THRESHOLD}, ` +
+      `field/method compartments omitted (set "compact": false to keep them)`
+  )
 }
 const byId = new Map(classes.map((c) => [c.id, c]))
 const relations = (Array.isArray(spec.relations) ? spec.relations : []).filter(
@@ -119,24 +137,59 @@ for (const c of classes) {
 for (const m of metrics.values()) m.height = m.headerHeight + m.fieldsHeight + m.methodsHeight
 
 // ---- layered layout (same idea as digraph, boxes are much taller) ---------
-const incoming = new Map(classes.map((c) => [c.id, 0]))
-for (const r of relations) incoming.set(r.to, (incoming.get(r.to) ?? 0) + 1)
-const depth = new Map()
-const queue = classes.filter((c) => (incoming.get(c.id) ?? 0) === 0).map((c) => c.id)
-for (const id of queue) depth.set(id, 0)
-let guard = classes.length * classes.length + classes.length
-while (queue.length > 0 && guard-- > 0) {
-  const id = queue.shift()
-  const base = depth.get(id) ?? 0
-  for (const r of relations.filter((x) => x.from === id)) {
-    const next = Math.max(depth.get(r.to) ?? 0, base + 1)
-    if (next !== depth.get(r.to)) {
-      depth.set(r.to, next)
-      queue.push(r.to)
+/**
+ * Assign a layer to every class.
+ *
+ * Seeding only from zero-in-degree roots is wrong for real code: any cycle
+ * (bidirectional dependency, callback, mutually referencing DTOs) means no node
+ * has in-degree 0, so nothing would ever be enqueued and every class would land
+ * in layer 0. Instead this is Kahn's algorithm with cycle breaking — when the
+ * queue empties but nodes remain, the remaining node with the fewest unvisited
+ * incoming edges is promoted to a root. Deterministic, and every class lands in
+ * a layer.
+ */
+function assignLayers(ids, edges) {
+  const remaining = new Map(ids.map((id) => [id, 0]))
+  for (const e of edges) if (remaining.has(e.to)) remaining.set(e.to, remaining.get(e.to) + 1)
+  const outgoing = new Map(ids.map((id) => [id, []]))
+  for (const e of edges) if (outgoing.has(e.from)) outgoing.get(e.from).push(e.to)
+
+  const layer = new Map()
+  const placed = new Set()
+  let brokenCycles = 0
+
+  while (placed.size < ids.length) {
+    const front = ids.filter((id) => !placed.has(id) && remaining.get(id) === 0)
+    if (front.length === 0) {
+      // Every unplaced node is part of a cycle: promote the calmest one.
+      const candidates = ids.filter((id) => !placed.has(id))
+      let best = candidates[0]
+      for (const id of candidates) if (remaining.get(id) < remaining.get(best)) best = id
+      brokenCycles += 1
+      front.push(best)
+    }
+    for (const id of front) {
+      if (placed.has(id)) continue
+      const base = layer.get(id) ?? 0
+      layer.set(id, base)
+      placed.add(id)
+      for (const to of outgoing.get(id)) {
+        if (placed.has(to)) continue
+        layer.set(to, Math.max(layer.get(to) ?? 0, base + 1))
+        remaining.set(to, Math.max(0, remaining.get(to) - 1))
+      }
     }
   }
+  return { layer, brokenCycles }
 }
-for (const c of classes) if (!depth.has(c.id)) depth.set(c.id, 0)
+
+const { layer: depth, brokenCycles } = assignLayers(
+  classes.map((c) => c.id),
+  relations
+)
+if (brokenCycles > 0) {
+  console.log(`[classmap] note: broke ${brokenCycles} dependency cycle(s) to keep the layout layered`)
+}
 
 const layers = new Map()
 for (const c of classes) {
@@ -145,33 +198,53 @@ for (const c of classes) {
   layers.get(d).push(c.id)
 }
 const maxDepth = Math.max(...layers.keys())
-const layerIndex = (d) => {
-  const step = Math.max(1, Math.floor(spec.columnsPerGroup ?? 1))
-  return Math.floor(d / step)
-}
 
 const positions = new Map()
 const titleOffset = spec.title ? 34 : 0
+// Printable width budget. A report page fits ~740px at 1:1; the default allows
+// up to roughly two of those so a dense diagram survives mild downscaling.
+const maxWidth = Number.isFinite(spec.maxWidth) && spec.maxWidth > 200 ? spec.maxWidth : 1480
+const ROW_GAP_IN_LAYER = 18
 let cursorY = titleOffset + 24
+const overWideRows = []
+
 for (let d = 0; d <= maxDepth; d += 1) {
   const ids = layers.get(d) ?? []
   if (ids.length === 0) continue
-  let cursorX = 24
+  // Wrap a layer into as many rows as the width budget needs, instead of
+  // running every class of the layer across one ever-widening line.
+  let rowX = 24
+  let rowY = cursorY
   let rowHeight = 0
+  let rowCount = 1
   for (const id of ids) {
     const m = metrics.get(id)
-    positions.set(id, { x: cursorX, y: cursorY, ...m })
-    cursorX += m.width + 26
+    if (rowX > 24 && rowX + m.width > maxWidth) {
+      rowY += rowHeight + ROW_GAP_IN_LAYER
+      rowX = 24
+      rowHeight = 0
+      rowCount += 1
+    }
+    positions.set(id, { x: rowX, y: rowY, ...m })
+    rowX += m.width + 26
     rowHeight = Math.max(rowHeight, m.height)
   }
-  cursorY += rowHeight + ROW_GAP_Y
-  void layerIndex
+  if (rowX > maxWidth + 1) overWideRows.push({ layer: d, width: Math.round(rowX) })
+  cursorY = rowY + rowHeight + ROW_GAP_Y
 }
 
 const rightEdge = Math.max(...[...positions.values()].map((p) => p.x + p.width))
 const bottomEdge = Math.max(...[...positions.values()].map((p) => p.y + p.height))
 const width = Math.max(360, Math.round(rightEdge + 24))
 const height = Math.max(200, Math.round(bottomEdge + 24))
+if (overWideRows.length > 0) {
+  const worst = overWideRows.reduce((a, b) => (a.width > b.width ? a : b))
+  console.log(
+    `[classmap] warning: ${overWideRows.length} row(s) exceed maxWidth=${maxWidth}px ` +
+      `(layer ${worst.layer} is ${worst.width}px) because a single class box is that wide; ` +
+      `raise maxWidth or split the diagram`
+  )
+}
 
 // ---- emit -----------------------------------------------------------------
 const parts = []
@@ -271,6 +344,8 @@ for (const r of relations) {
       ` marker-end="url(#${style.marker})"${startAttr}/>`
   )
   if (r.label) {
+    // Cardinality is rendered inside the label box, so it must be measured too,
+    // otherwise a long "label (1 → *)" overflows its own background.
     const text = r.cardinality ? `${r.label}  (${r.cardinality})` : r.label
     const lw = textWidth(text, 10.5)
     parts.push(

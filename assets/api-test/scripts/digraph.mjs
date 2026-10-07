@@ -78,26 +78,57 @@ if (nodes.length === 0) {
 }
 
 // ---- layered layout -------------------------------------------------------
-const incoming = new Map(nodes.map((n) => [n.id, 0]))
-for (const e of edges) incoming.set(e.to, (incoming.get(e.to) ?? 0) + 1)
+/**
+ * Assign a layer to every node.
+ *
+ * Seeding only from zero-in-degree roots breaks on cyclic graphs: a real call
+ * chain can contain a callback or a mutual reference, and then no node has
+ * in-degree 0, nothing is ever enqueued, and every node collapses into layer 0.
+ * This is Kahn's algorithm with cycle breaking — when the queue empties with
+ * nodes still unplaced, the remaining node with the fewest unvisited incoming
+ * edges becomes a root. Deterministic, and every node lands in a layer.
+ */
+function assignLayers(ids, links) {
+  const remaining = new Map(ids.map((id) => [id, 0]))
+  for (const e of links) if (remaining.has(e.to)) remaining.set(e.to, remaining.get(e.to) + 1)
+  const outgoing = new Map(ids.map((id) => [id, []]))
+  for (const e of links) if (outgoing.has(e.from)) outgoing.get(e.from).push(e.to)
 
-const layer = new Map()
-const queue = nodes.filter((n) => (incoming.get(n.id) ?? 0) === 0).map((n) => n.id)
-for (const id of queue) layer.set(id, 0)
-// Kahn-style relaxation with a visit cap, so a cycle cannot hang the script.
-let guard = nodes.length * nodes.length + nodes.length
-while (queue.length > 0 && guard-- > 0) {
-  const id = queue.shift()
-  const base = layer.get(id) ?? 0
-  for (const e of edges.filter((x) => x.from === id)) {
-    const next = Math.max(layer.get(e.to) ?? 0, base + 1)
-    if (next !== layer.get(e.to)) {
-      layer.set(e.to, next)
-      queue.push(e.to)
+  const assigned = new Map()
+  const placed = new Set()
+  let brokenCycles = 0
+
+  while (placed.size < ids.length) {
+    const front = ids.filter((id) => !placed.has(id) && remaining.get(id) === 0)
+    if (front.length === 0) {
+      const candidates = ids.filter((id) => !placed.has(id))
+      let best = candidates[0]
+      for (const id of candidates) if (remaining.get(id) < remaining.get(best)) best = id
+      brokenCycles += 1
+      front.push(best)
+    }
+    for (const id of front) {
+      if (placed.has(id)) continue
+      const base = assigned.get(id) ?? 0
+      assigned.set(id, base)
+      placed.add(id)
+      for (const to of outgoing.get(id)) {
+        if (placed.has(to)) continue
+        assigned.set(to, Math.max(assigned.get(to) ?? 0, base + 1))
+        remaining.set(to, Math.max(0, remaining.get(to) - 1))
+      }
     }
   }
+  return { layer: assigned, brokenCycles }
 }
-for (const n of nodes) if (!layer.has(n.id)) layer.set(n.id, 0)
+
+const { layer, brokenCycles } = assignLayers(
+  nodes.map((n) => n.id),
+  edges
+)
+if (brokenCycles > 0) {
+  console.log(`[digraph] note: broke ${brokenCycles} dependency cycle(s) to keep the layout layered`)
+}
 
 // ---- geometry ------------------------------------------------------------
 const FONT = 13

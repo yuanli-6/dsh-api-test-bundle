@@ -1,5 +1,5 @@
-/**
- * md2pdf — render a Chinese-friendly PDF from a Markdown report.
+﻿/**
+ * md2pdf 鈥?render a Chinese-friendly PDF from a Markdown report.
  *
  * Why this exists: the DSH runtime ships no PDF library (no reportlab/weasyprint
  * in Python, no puppeteer/md-to-pdf in Node), but a Chromium browser is almost
@@ -51,17 +51,34 @@ function markdownToHtml(md, opts = {}) {
   const lines = md.replace(/\r\n?/g, '\n').split('\n')
   const out = []
   let i = 0
-  let wroteContent = false
 
   const renderTable = (rows) => {
-    const cells = (row) =>
-      row
-        .replace(/^\s*\|/, '')
-        .replace(/\|\s*$/, '')
-        .split('|')
-        .map((c) => c.trim())
-    const head = cells(rows[0])
-    const body = rows.slice(2).map(cells)
+    // Split on unescaped pipes only. Report cells escape a literal pipe as `\|`
+    // (the generator writes parameter values through String.replace(/\|/g, '\\|')),
+    // and a naive split would turn one cell into two and shift every later column.
+    const splitRow = (row) => {
+      const body = row.replace(/^\s*\|/, '').replace(/\|\s*$/, '')
+      const cells = []
+      let current = ''
+      for (let index = 0; index < body.length; index += 1) {
+        const ch = body[index]
+        if (ch === '\\' && body[index + 1] === '|') {
+          current += '|'
+          index += 1
+          continue
+        }
+        if (ch === '|') {
+          cells.push(current.trim())
+          current = ''
+          continue
+        }
+        current += ch
+      }
+      cells.push(current.trim())
+      return cells
+    }
+    const head = splitRow(rows[0])
+    const body = rows.slice(2).map(splitRow)
     return [
       '<table>',
       '<thead><tr>' + head.map((c) => `<th>${inline(c)}</th>`).join('') + '</tr></thead>',
@@ -95,7 +112,6 @@ function markdownToHtml(md, opts = {}) {
       } else {
         out.push(`<figure class="diagram"><img src="${escapeHtml(src)}" alt="${escapeHtml(alt)}"><figcaption>${inline(alt)}</figcaption></figure>`)
       }
-      wroteContent = true
       i += 1
       continue
     }
@@ -188,10 +204,8 @@ function markdownToHtml(md, opts = {}) {
     }
     if (para.length > 0) {
       out.push(`<p>${inline(para.join(' '))}</p>`)
-      wroteContent = true
     }
   }
-  void wroteContent
   return out.join('\n')
 }
 
