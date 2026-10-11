@@ -29,11 +29,11 @@ const SKILL_NAME = 'api-test'
 
 /** Catalog description shown to the model and to the user. */
 const SKILL_DESCRIPTION =
-  '接口测试 Skill：覆盖 HTTP/RESTful、SOAP、RPC(Dubbo/gRPC)、消息队列(Kafka/RabbitMQ/SQS)、Spring Integration 与本地 @Service 方法的本地联调。用 ask_user_question 让用户选择测试范围、测试次数与是否导出关系图，每轮参数完全不同；按「定位接口定义 → 解析协议与缓存 → 生成测试数据 → 拼接实际端点 → 检查启动状态 → 分派发送并验证 → 统计报错」的固定工作流执行，最后产出含完整 API 说明的 Markdown/PDF 报告与关联关系图。'
+  '接口测试 Skill：覆盖 HTTP/RESTful、SOAP、RPC(Dubbo/gRPC)、消息队列(Kafka/RabbitMQ/SQS)、Spring Integration 与本地 @Service 方法的本地联调。用 ask_user_question 让用户选择测试范围、测试次数与是否导出关系图，每轮参数在正常区间内整体更换；按「定位接口定义 → 解析协议与缓存 → 生成测试数据 → 拼接实际端点 → 检查启动状态 → 分派发送并验证 → 统计报错」的固定工作流执行，最后交付完整测试报告、主流格式测试用例（Markdown + Excel，含「契约校验已覆盖」表）与接口返回字段来源关系图。'
 
 /** Trigger phrases; decides when the harness advertises this skill. */
 const SKILL_WHEN_TO_USE =
-  '当用户说「要接口测试」「测一下这个接口」「验证接口行为」「检查接口返回」「这个接口报错了」「给我接口测试报告」，或要求对某个 Controller / RPC / MQ / SOAP 接口做本地联调验证、导出接口文档或关系图时使用。'
+  '当用户说「要接口测试」「测一下这个接口」「验证接口行为」「检查接口返回」「这个接口报错了」「给我接口测试报告」「生成测试用例」「要测试用例表」，或要求对某个 Controller / RPC / MQ / SOAP 接口做本地联调验证、导出接口文档、字段来源关系图或调用关系图时使用。'
 
 /** Absolute file URL of the skill body. */
 const SKILL_FILE_URL = new URL('./assets/api-test/SKILL.md', import.meta.url)
@@ -58,8 +58,11 @@ const FALLBACK_CONTENT = [
   '3. 按参数类型构造测试数据，避免使用真实用户数据。',
   '4. 从 application.yml 等配置拼接实际端点。',
   '5. 先确认项目与中间件已启动；未启动就停止并提示，不反复重试。',
-  '6. 发送请求并验证状态码、响应结构、边界值、幂等性、响应时间与异常场景。',
-  '7. 报错时区分「接口本身报错」与「连接/基础设施报错」并统计。'
+  '6. 发送请求并验证状态码、响应结构、合法边界值、幂等性、响应时间与未被代码校验覆盖的异常场景。',
+  '7. 报错时区分「接口本身报错」与「连接/基础设施报错」并统计。',
+  '8. 测试完成必须交付测试用例：docs/api-test-cases.md 与 docs/api-test-cases.xlsx（用 cases2xlsx.mjs 生成），',
+  '   并附「契约校验已覆盖」表说明哪些非法输入因代码已显式校验而未单列用例。',
+  '9. 需要时交付接口返回字段来源关系图：字段 → 来源表 → 查询条件 → 层级，只依据真实代码，无法确定标「待确认」。'
 ].join('\n')
 
 /**

@@ -51,9 +51,15 @@ for (const file of walk('.')) {
 }
 
 for (const script of [
+  'index.js',
+  'verify.mjs',
+  'verify-cases.mjs',
+  'check-patch.mjs',
+  'check-encoding.mjs',
   'assets/api-test/scripts/md2pdf.mjs',
   'assets/api-test/scripts/digraph.mjs',
-  'assets/api-test/scripts/classmap.mjs'
+  'assets/api-test/scripts/classmap.mjs',
+  'assets/api-test/scripts/cases2xlsx.mjs'
 ]) {
   const result = spawnSync(process.execPath, ['--check', script], { encoding: 'utf8' })
   if (result.status !== 0) {

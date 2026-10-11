@@ -12,9 +12,16 @@ dsh-api-test-bundle/
 ├── index.js                         # 读取 SKILL.md 并注册技能
 ├── assets/
 │   └── api-test/
-│       └── SKILL.md                 # 技能正文（唯一可编辑的内容源）
-├── verify.mjs                       # 本地自检
+│       ├── SKILL.md                 # 技能正文（唯一可编辑的内容源）
+│       └── scripts/                 # 四个零依赖脚本
+│           ├── md2pdf.mjs           # Markdown → PDF（本机 Chrome/Edge headless）
+│           ├── digraph.mjs          # 调用链路图 → SVG
+│           ├── classmap.mjs         # UML 类关系图 → SVG
+│           └── cases2xlsx.mjs       # 用例表 / 字段来源表 → 真正的 .xlsx（+ 可选 CSV）
+├── verify.mjs                       # 本地自检（技能正文 + 注册对象 + 清单）
+├── verify-cases.mjs                 # cases2xlsx 自检：真实规模数据 + 从产物字节回读
 ├── check-patch.mjs                  # patch 结构校验
+├── check-encoding.mjs               # 编码与语法不变式
 └── LICENSE
 ```
 
@@ -108,15 +115,53 @@ target: <本目录绝对路径>
 3. **图的形态**（若第 1 步已带图则只确认这个）：纵向拓扑 / 横向调用链
 4. **导出格式**：Markdown / Markdown + PDF / 再加接口类与字段关系明细
 
-最终产出放在**被测项目根的 `docs/`**：完整 Markdown 报告、可选 PDF、结构化 `api-test-result.json`、调用链路图与 UML 类图 SVG、Mermaid `.mmd`。报告里每个接口都有完整 API 说明（类名、方法签名、源码行号、直连与网关地址、参数表、返回结构、示例报文、逐轮用例、异常边界）。
+最终产出放在**被测项目根的 `docs/`**：完整 Markdown 报告、可选 PDF、结构化 `api-test-result.json`、
+**测试用例 `api-test-cases.md` + `.xlsx`**、**字段来源关系图 `api-test-field-source.md`（+ `.xlsx`）**、
+调用链路图与 UML 类图 SVG、Mermaid `.mmd`。报告里每个接口都有完整 API 说明（类名、方法签名、源码行号、直连与网关地址、参数表、返回结构、示例报文、逐轮用例、异常边界）。
+
+## 测试用例交付与字段来源图（v1.4.0）
+
+v1.4.0 把「测试跑完给什么」写成了硬要求：
+
+### 1. 每轮测试完成必出测试用例（不再是可选）
+
+- 产物：`docs/api-test-cases.md` + **`docs/api-test-cases.xlsx`**（用 `cases2xlsx.mjs` 生成的真 xlsx；
+  多 sheet、表头加粗冻结、自动筛选；`--csv` 还会附一份 UTF-8 BOM 的 CSV）
+- 列结构取主流测试管理工具（禅道 / TestLink / Excel 用例表）的写法：
+  `用例编号 | 所属模块 | 接口名称 | 接口路径 | 用例标题 | 用例类型 | 优先级 | 前置条件 | 测试步骤 | 测试数据 | 预期结果 | 实际结果 | 结论`
+- 设计方法用通用那几种：等价类划分 / 边界值分析 / 判定表（pairwise）/ 场景法与状态迁移 / 业务规则正反例
+- 用例编号 `TC-<Controller 简称>-<3 位序号>`；类型 `正向 / 业务规则 / 边界(合法) / 异常(未被代码校验覆盖) / 幂等 / 性能观察`；
+  优先级 `P0/P1/P2`；预期结果必须能判定（HTTP + 业务码 + data 关键字段）
+
+### 2. 参数只在正常范围内变更，不再堆非法参数
+
+- 每一轮的参数都落在**业务合法区间**内，轮次之间整体换一套（不是把某一轮改成空值/负数）
+- **代码里已经显式校验的约束不再单独造反例用例**——非空（`@NotNull`/`@NotBlank`/`StringUtils.isBlank`）、
+  长度（`@Size`）、范围（`@Min`/`@Max`）、枚举、格式（`@Pattern`）、条件必填、互斥；
+  改为在报告里出一张 **「契约校验已覆盖」** 表：`约束 | 代码位置 | 校验方式 | 处理`
+- 仍然要测的是**代码没管**的异常：状态流转限制、跨字段业务规则、权限、重复提交/并发
+- 边界只在合法区间内取（合法 min / max / 典型中间值），不固定造 `min-1` / `max+1`
+
+### 3. 接口返回字段来源关系图
+
+按「字段名 / 含义 / 来源表 / 查询条件 / 层级」逐字段说明返回值来源：
+
+- 必须依据真实代码，**不编造字段来源**；不确定的标「待确认」
+- DTO/VO/Entity 读字段；`List<Map>` / `Map<String,Object>` **以代码里 `put` 的 key 为准**，动态 key 标「动态 key，待确认」
+- 嵌套对象 / 集合用层级列或缩进体现父子结构；查询条件追溯到请求参数、代码固定条件或关联关系（如 `a.id = b.a_id`）
+- 产物：`docs/api-test-field-source.md`（+ 字段多时 `.xlsx`）
+- 与另两张图分工：字段来源图回答"字段从哪来"，`digraph.mjs` 回答"请求经过哪些层"，`classmap.mjs` 回答"类之间什么关系"
 
 ## 内置脚本（零依赖）
 
-`assets/api-test/scripts/` 下三个脚本，技能会调用它们，你也可以单独用：
+`assets/api-test/scripts/` 下四个脚本，技能会调用它们，你也可以单独用：
 
 ```powershell
 # Markdown -> PDF：内部用 Chrome/Edge headless 打印，中文字体已适配
 node assets/api-test/scripts/md2pdf.mjs 报告.md [输出.pdf]
+
+# 用例表 / 字段来源表 -> 真正的 .xlsx（也可 --csv 出 UTF-8 BOM 的 CSV）
+node assets/api-test/scripts/cases2xlsx.mjs 用例.json 用例.xlsx [--csv]
 
 # 调用链路图 -> SVG：自算分层布局，纵向适合放进 A4
 node assets/api-test/scripts/digraph.mjs 图描述.json 输出.svg
@@ -124,6 +169,11 @@ node assets/api-test/scripts/digraph.mjs 图描述.json 输出.svg
 # UML 类关系图 -> SVG：类框分「类名/字段/方法」三栏，关系带箭头语义与基数
 node assets/api-test/scripts/classmap.mjs 类图描述.json 输出.svg
 ```
+
+`cases2xlsx.mjs` 输入是一个 JSON（`{ title, sheets: [{ name, columns, rows, widths? }] }`，单 sheet 也可）。
+所有字符串都按**文本**写入（`inlineStr`）：`=1+1`、`00123`、`2026-10-11` 不会被 Excel 当公式/数字/日期改写；
+数字与布尔值保持真实类型以便排序求和；超过 Excel 单元格上限（32767 字符）会截断并在 stderr 告警；
+sheet 名里的 `: \ / ? * [ ]` 会被替换。**不要手写 xlsx 二进制。**
 
 `classmap.mjs` 的记法参考 PlantUML 类图 / Mermaid `classDiagram`：
 
@@ -149,10 +199,16 @@ node assets/api-test/scripts/classmap.mjs 类图描述.json 输出.svg
 ## 本地自检（不依赖 DSH）
 
 ```powershell
-node verify.mjs            # 技能正文 + 注册对象 + 清单校验（135 项）
+node verify.mjs            # 技能正文 + 注册对象 + 清单校验（172 项）
+node verify-cases.mjs      # cases2xlsx 自检：64 条用例 / 5 个 sheet，从产物字节回读单元格（24 项）
 node check-patch.mjs       # cordis.patch.yml 的 insert 结构
 node check-encoding.mjs    # 不变式：全仓库无 BOM、JSON 可解析、脚本语法通过
 ```
+
+`verify-cases.mjs` 是给 `cases2xlsx.mjs` 用的：它不用玩具数据（空表、一行两列那种全绿但漏缺陷），
+而是 64 条用例 × 13 列、5 个 sheet，含超长文本、缺失字段、`<&>"'`、表情、换行、前导零、
+公式样式文本与超 Excel 上限的单元格；生成后**自己把 ZIP 解开**、从 XML 里读回单元格逐条核对，
+并校验 CSV 的引号/逗号/换行转义。**它证明的是内容，不只是"能打开"。**
 
 `check-encoding.mjs` 存在的理由：`package.json` 一旦带上 UTF-8 BOM，
 **从 GitHub 安装会直接失败**（pnpm 报 `Unexpected token '\uFEFF'`）。

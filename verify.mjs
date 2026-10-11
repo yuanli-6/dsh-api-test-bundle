@@ -241,14 +241,63 @@ for (const [label, re] of flowRequired) {
 }
 
 console.log('')
+console.log('--- test-case delivery + field-source diagram contract ---')
+const deliveryRequired = [
+  ['测试用例交付一节存在且标注必做', /## 测试用例交付（每轮测试完成必做，不是可选项）/],
+  ['用例编号命名规则', /TC-<Controller 简称>-<3 位序号>/],
+  ['主流列结构：所属模块', /\| 所属模块 \|/],
+  ['主流列结构：前置条件/测试步骤/测试数据', /\| 前置条件 \| 测试步骤 \| 测试数据 \|/],
+  ['用例类型枚举', /`正向` \/ `业务规则` \/ `边界\(合法\)` \/ `异常\(未被代码校验覆盖\)`/],
+  ['优先级 P0/P1/P2', /`P0`（主流程）\/ `P1`/],
+  ['预期结果必须可判定', /必须能判定——HTTP 状态码 \+ 业务码 \+ data 关键字段值/],
+  ['设计方法：等价类划分', /等价类划分/],
+  ['设计方法：边界值分析', /边界值分析/],
+  ['设计方法：判定表/pairwise', /pairwise/],
+  ['设计方法：场景法/状态迁移', /状态迁移/],
+  ['必出两份产物 md + xlsx', /docs\/api-test-cases\.md`（人看的/],
+  ['xlsx 用脚本生成，禁止手写二进制', /不要手写二进制/],
+  ['契约校验已覆盖表', /「契约校验已覆盖」/],
+  ['参数取值口径一节', /### 参数取值口径（重要）/],
+  ['参数只在正常合法区间变更', /每一轮的参数都要在业务合法区间内/],
+  ['代码已显式校验的错误参数不再造用例', /代码已经显式校验的约束，不再单独造错误参数做用例/],
+  ['列出显式校验的形态（非空/长度/范围/枚举/格式）', /非空判断（`@NotNull` \/ `@NotBlank` \/ `StringUtils\.isBlank`）/],
+  ['边界只在合法区间内取，不固定造 min-1/max+1', /不要固定去造 `min-1` \/ `max\+1`/],
+  ['字段来源关系图一节存在', /## 接口返回字段来源关系图/],
+  ['字段来源五要素', /来源表（或来源对象）/],
+  ['不编造字段来源', /不允许凭空编造字段来源/],
+  ['List<Map> 以 put 的 key 为准', /以 `put` 的 key 为准/],
+  ['动态 key 标注待确认', /动态 key，待确认/],
+  ['无法确定标待确认', /无法确定来源的字段标注「待确认」/],
+  ['字段来源表列结构', /\| 层级 \| 返回字段 \| 含义 \| 来源表 \| 查询条件 \| 备注 \|/],
+  ['三类图分工说明', /三者都要时各出一份，不要互相替代/],
+  ['cases2xlsx 脚本用法', /scripts\/cases2xlsx\.mjs/],
+  ['cases2xlsx 保留文本不被 Excel 改写', /不会被 Excel 当成公式\/数字\/日期改写/],
+  ['cases2xlsx 单元格上限告警', /32767 字符/],
+  ['报告必含测试用例一节', /7\. \*\*测试用例\*\*（\*\*必出\*\*/],
+  ['报告必含字段来源小节', /8\. \*\*接口返回字段来源关系图\*\*/],
+  ['自检要求跑 verify-cases', /node verify-cases\.mjs/],
+  ['自检要求抽查 xlsx 单元格', /文件存在不等于内容正确/]
+]
+for (const [label, re] of deliveryRequired) {
+  check(label, () => assert.match(flowSource, re))
+}
+
+console.log('')
 console.log('--- bundled helper scripts present ---')
 for (const rel of [
   'assets/api-test/scripts/md2pdf.mjs',
   'assets/api-test/scripts/digraph.mjs',
-  'assets/api-test/scripts/classmap.mjs'
+  'assets/api-test/scripts/classmap.mjs',
+  'assets/api-test/scripts/cases2xlsx.mjs',
+  'verify-cases.mjs'
 ]) {
   check(`${rel} 存在且非空`, () => assert.ok(readFileSync(rel, 'utf8').length > 500))
 }
+check('the new scripts ship inside the package (files whitelist covers assets and verify-cases)', () => {
+  const files = pkg.files ?? []
+  assert.ok(files.includes('assets'), 'assets not in files')
+  assert.ok(files.includes('verify-cases.mjs'), 'verify-cases.mjs not in files')
+})
 
 console.log('')
 if (warnings.length > 0) console.log(`activation warnings: ${warnings.join(' | ')}`)
