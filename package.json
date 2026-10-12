@@ -1,8 +1,8 @@
 {
   "name": "dsh-api-test-bundle",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "private": true,
-  "description": "Pure-skill DSH bundle: registers the api-test interface testing skill — local protocol testing, mainstream-format test cases (Markdown + real .xlsx), interface return field-source diagrams, and call-chain/UML class diagrams.",
+  "description": "Pure-skill DSH bundle: registers the api-test interface testing skill — local protocol testing, mainstream-format test cases (Markdown + real .xlsx), bottom-up interface return field-source diagrams (SQL columns, stream operator chains, framework interceptors), and call-chain/UML class diagrams.",
   "keywords": [
     "dsh",
     "dsh-bundle",
